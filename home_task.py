@@ -57,7 +57,7 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 2:
-        print("Usage: python sort.py <folder_path>")
+        print("Usage: python homo_task.py <folder_path>")
     else:
         folder_path = sys.argv[1]
         known_extensions, unknown_extensions = sort_files(folder_path)
