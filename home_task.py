@@ -1,13 +1,29 @@
 import os
 import shutil
 import re
+import zipfile
+import rarfile
 
 from transliterate import translit
 
 def normalize(filename):
+    # Транслітерація кирилічних символів на латинську
     normalized_name = translit(filename, 'ru', reversed=True)
+    # Заміна всіх символів, крім літер латинського алфавіту та цифр, на "_"
     normalized_name = re.sub(r'[^a-zA-Z0-9_.]', '_', normalized_name)
     return normalized_name
+
+def unpack_archive(archive_path, target_folder):
+    """Розпаковує архів у вказану теку."""
+    try:
+        if zipfile.is_zipfile(archive_path):
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(target_folder)
+        elif rarfile.is_rarfile(archive_path):
+            with rarfile.RarFile(archive_path, 'r') as rar_ref:
+                rar_ref.extractall(target_folder)
+    except Exception as e:
+        print(f"Failed to unpack archive {archive_path}: {e}")
 
 def sort_files(folder_path):
     # Список відомих розширень для кожної категорії
@@ -16,13 +32,14 @@ def sort_files(folder_path):
         'video': ('AVI', 'MP4', 'MOV', 'MKV'),
         'documents': ('DOC', 'DOCX', 'TXT', 'PDF', 'XLSX', 'PPTX'),
         'audio': ('MP3', 'OGG', 'WAV', 'AMR'),
-        'archives': ('ZIP', 'GZ', 'TAR'),
+        'archives': ('ZIP', 'GZ', 'TAR', 'RAR'),
     }
 
+    # Створення папок для кожної категорії
     for category in known_extensions:
         os.makedirs(os.path.join(folder_path, category), exist_ok=True)
 
-    unknown_extensions = set()  # не відомо що це за файли
+    unknown_extensions = set()  # Сет для невідомих розширень
 
     for root, _, files in os.walk(folder_path):
         for filename in files:
@@ -41,7 +58,7 @@ def sort_files(folder_path):
                     break
 
             if not moved:
-                # Файл невідомі
+                # Файл має невідоме розширення
                 unknown_extensions.add(extension)
 
     # Видалення порожніх папок
@@ -50,6 +67,18 @@ def sort_files(folder_path):
             folder_path = os.path.join(root, folder)
             if not os.listdir(folder_path):
                 os.rmdir(folder_path)
+
+    # Розпакування архівів та переміщення файлів з вкладених тек в корінь
+    for root, dirs, files in os.walk(folder_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            extension = filename.split('.')[-1].upper()
+            
+            if extension in known_extensions['archives']:
+                # Розпакування архіву
+                unpack_archive(file_path, root)
+                # Видалення розпакованого архіву
+                os.remove(file_path)
 
     return known_extensions, list(unknown_extensions)
 
